@@ -13,6 +13,16 @@ let coq_syntax =
     ; ((0, 8), `Since (3, 8))
     ]
 
+let get_coq_syntax () =
+  let* version = Dune_lang.Syntax.get_exn coq_syntax in
+  if version < (0, 8) then
+    User_error.raise
+      [ Pp.text
+          "Coq Language Versions lower than 0.8 have been removed in Dune 3.8, \
+           please upgrade to (coq lang 0.8) or later if available"
+      ];
+  return version
+
 module Coqpp = struct
   type t =
     { modules : Ordered_set_lang.t
@@ -54,7 +64,7 @@ module Buildable = struct
         ]
 
   let decode =
-    let* coq_lang_version = Dune_lang.Syntax.get_exn coq_syntax in
+    let* coq_lang_version = get_coq_syntax () in
     let+ loc = loc
     and+ flags = Ordered_set_lang.Unexpanded.field "flags"
     and+ mode =
@@ -72,11 +82,7 @@ module Buildable = struct
         >>> repeat (located Lib_name.decode))
     and+ plugins =
       field "plugins" (repeat (located Lib_name.decode)) ~default:[]
-    and+ theories =
-      field "theories"
-        (Dune_lang.Syntax.since coq_syntax (0, 2) >>> repeat Coq_lib_name.decode)
-        ~default:[]
-    in
+    and+ theories = field "theories" (repeat Coq_lib_name.decode) ~default:[] in
     let plugins = merge_plugins_libraries ~plugins ~libraries in
     { flags; mode; use_stdlib; coq_lang_version; plugins; theories; loc }
 end

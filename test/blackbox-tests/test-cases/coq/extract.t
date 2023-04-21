@@ -1,6 +1,6 @@
   $ cat >dune-project <<EOF
-  > (lang dune 2.5)
-  > (using coq 0.2)
+  > (lang dune 2.8)
+  > (using coq 0.3)
   > EOF
 
   $ cat >extract.v <<EOF
@@ -34,6 +34,8 @@
   > EOF
 
   $ dune exec ./foo.exe
+  Warning: Coq Language Versions lower than 0.8 have been deprecated in Dune
+  3.8 and will be removed in Dune 3.9
   false
   $ ls _build/default
   Datatypes.ml
