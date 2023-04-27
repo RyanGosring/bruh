@@ -1,5 +1,7 @@
 Unreleased
 ----------
+- Allow preprocessing actions to be run before ppx (#7373, fixes #171,
+  @anmonteiro)
 
 - Allow overriding the `ocaml` binary with findlib configuration (#7648,
   @rgrinberg)
