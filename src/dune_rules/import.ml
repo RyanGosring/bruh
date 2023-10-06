@@ -89,6 +89,7 @@ include struct
   module Binary_kind = Binary_kind
   module Visibility = Visibility
   module Dep_conf = Dep_conf
+  module Shell_spec = Shell_spec
 end
 
 include Dune_engine.No_io

@@ -93,6 +93,7 @@ module With_deps_if_necessary : sig
   (** Same as [expand_xxx] but stay in the [Memo] monad if possible. *)
 
   val expand_path : t -> String_with_vars.t -> Path.t list Deps.t
+  val expand_single_path : t -> String_with_vars.t -> Path.t Deps.t
   val expand_str : t -> String_with_vars.t -> string Deps.t
 end
 

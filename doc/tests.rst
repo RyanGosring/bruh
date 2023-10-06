@@ -642,7 +642,7 @@ for two reasons:
 
 We can specify dependencies using the ``deps`` field using the usual syntax:
 
-.. code:: bash
+.. code:: dune
 
    (cram
     (deps ../foo.exe))
@@ -651,7 +651,7 @@ This introduces a dependency on ``foo.exe`` on all Cram tests in this directory.
 To apply the stanza to a particular test, it's possible to use ``applies_to``
 field:
 
-.. code::
+.. code:: dune
 
    (cram
     (applies_to * \ foo bar)
@@ -674,6 +674,16 @@ The ``cram`` stanza accepts the following fields:
 - ``deps`` - dependencies of the test
 - ``(package <package-name>)`` - attach the tests selected by this stanza to the
   specified package
+- ``(shell <shell-prog> <args>..)`` - (available since Dune 3.12) specify the shell to be
+  used when executing the commands in Cram test files. ``<shell-prog>`` can now
+  be one of the following values:
+
+  - ``:system`` - this stipulates that the system shell (that is, what you get
+    with ``/usr/bin/env sh``) should be used. This is the default when this
+    field does not present.
+
+  - ``<dep>`` - ``<dep>`` should specify the path to an executable, which will
+    be used as the shell program. :doc:`concepts/variables` will be expanded.
 
 A single test may be configured by more than one ``cram`` stanza. In such cases,
 the values from all applicable ``cram`` stanzas are merged together to get the

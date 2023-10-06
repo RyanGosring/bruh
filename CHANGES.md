@@ -5,6 +5,9 @@ If you're a contributor, please include your CHANGES entry in a file
 `doc/changes/$PR_NAME.md`. At release time, it will be incoporated into the
 changelog properly.
 
+- Add `(shell ..)` option to `(cram)` stanza and user action specification.
+  (#8134, @haochenx)
+
 3.11.0 (2023-09-22)
 -------------------
 

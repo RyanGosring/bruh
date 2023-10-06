@@ -384,7 +384,7 @@ let create_sh_script cram_stanzas ~temp_dir : sh_script Fiber.t =
 
 let _display_with_bars s = List.iter (String.split_lines s) ~f:(Printf.eprintf "| %s\n")
 
-let run ~env ~script lexbuf : string Fiber.t =
+let run ~env ~script ~shell:(shell, shell_args) lexbuf : string Fiber.t =
   let temp_dir =
     let suffix =
       let basename = Path.basename script in
@@ -417,10 +417,6 @@ let run ~env ~script lexbuf : string Fiber.t =
   in
   let open Fiber.O in
   let+ () =
-    let sh =
-      let path = Env_path.path Env.initial in
-      Option.value_exn (Bin.which ~path "sh")
-    in
     let metadata =
       let name =
         let base = Path.basename sh_script.script in
@@ -436,29 +432,52 @@ let run ~env ~script lexbuf : string Fiber.t =
       ~dir:cwd
       ~env
       Strict
-      sh
-      [ Path.to_string sh_script.script ]
+      shell
+      (shell_args @ [ Path.to_string sh_script.script ])
   in
   let raw = read_and_attach_exit_codes sh_script in
   let sanitized = sanitize ~parent_script:sh_script.script raw in
   compose_cram_output sanitized
 ;;
 
-let run ~env ~script = run_expect_test script ~f:(fun lexbuf -> run ~env ~script lexbuf)
+let run ~env ~script ~shell =
+  run_expect_test script ~f:(fun lexbuf -> run ~env ~script ~shell lexbuf)
+;;
+
+type ('path, _) spec =
+  { script : 'path
+  ; shell_prog : 'path
+  ; shell_args : string list
+  }
 
 module Spec = struct
-  type ('path, _) t = 'path
+  type ('path, 'target) t = ('path, 'target) spec
 
   let name = "cram"
   let version = 1
-  let bimap path f _ = f path
-  let is_useful_to ~distribute:_ ~memoize:_ = true
 
-  let encode script path _ : Dune_lang.t =
-    List [ Dune_lang.atom_or_quoted_string "cram"; path script ]
+  let bimap spec f _ =
+    { script = f spec.script
+    ; shell_prog = f spec.shell_prog
+    ; shell_args = spec.shell_args
+    }
   ;;
 
-  let action script ~ectx:_ ~(eenv : Action.Ext.env) = run ~env:eenv.env ~script
+  let is_useful_to ~distribute:_ ~memoize:_ = true
+
+  let encode { script; shell_prog; shell_args } path _ : Dune_sexp.t =
+    let atom = Dune_lang.atom_or_quoted_string in
+    List
+      [ atom "cram"
+      ; path script
+      ; List [ atom "shell"; List (path shell_prog :: List.map ~f:atom shell_args) ]
+      ]
+  ;;
+
+  let action { script; shell_prog; shell_args } ~ectx:_ ~(eenv : Action.Ext.env) =
+    let shell = shell_prog, shell_args in
+    run ~env:eenv.env ~script ~shell
+  ;;
 end
 
 let action script =

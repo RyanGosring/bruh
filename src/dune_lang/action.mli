@@ -114,7 +114,7 @@ type t =
   | Diff of (String_with_vars.t, String_with_vars.t) Diff.t
   | No_infer of t
   | Pipe of Outputs.t * t list
-  | Cram of String_with_vars.t
+  | Cram of String_with_vars.t * Shell_spec.t
   | Patch of String_with_vars.t
   | Substitute of String_with_vars.t * String_with_vars.t
   | Withenv of String_with_vars.t Env_update.t list * t
