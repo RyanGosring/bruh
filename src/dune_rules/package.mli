@@ -28,23 +28,24 @@ module Id : sig
   include Comparable_intf.S with type key := t
 end
 
-module Dependency : sig
-  module Constraint : sig
-    module Op : sig
-      type t = Dune_lang.Package_constraint.Op.t
+module Constraint : sig
+  module Op : sig
+    type t = Dune_lang.Package_constraint.Op.t
 
-      val to_relop : t -> OpamParserTypes.FullPos.relop
-    end
-
-    module Value : sig
-      type t = Dune_lang.Package_constraint.Value.t
-    end
-
-    type t = Dune_lang.Package_constraint.t
-
-    val to_dyn : t -> Dyn.t
+    val to_relop : t -> OpamParserTypes.FullPos.relop
   end
 
+  module Value : sig
+    type t = Dune_lang.Package_constraint.Value.t
+  end
+
+  type t = Dune_lang.Package_constraint.t
+
+  val to_dyn : t -> Dyn.t
+  val opam_constraint : t -> OpamParserTypes.FullPos.value
+end
+
+module Dependency : sig
   type t =
     { name : Name.t
     ; constraint_ : Constraint.t option
@@ -120,6 +121,7 @@ type t =
   ; depends : Dependency.t list
   ; conflicts : Dependency.t list
   ; depopts : Dependency.t list
+  ; available : Constraint.t option
   ; info : Info.t
   ; version : string option
   ; has_opam_file : opam_file

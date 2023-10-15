@@ -114,6 +114,7 @@ let package_fields
   ; depends
   ; conflicts
   ; depopts
+  ; available
   ; info = _
   ; id = _
   ; version = _
@@ -143,7 +144,14 @@ let package_fields
       | [] -> None
       | _ :: _ -> Some (k, list Package.Dependency.opam_depend v))
   in
-  let fields = [ optional; dep_fields ] in
+  let available_field =
+    match available with
+    | None -> []
+    | Some constraint_ ->
+      let opam_constraint = Package.Constraint.opam_constraint constraint_ in
+      [ "available", opam_constraint ]
+  in
+  let fields = [ optional; dep_fields; available_field ] in
   let fields =
     let dune_version = Dune_project.dune_version project in
     if dune_version >= (2, 0) && tags <> [] then tags :: fields else fields
@@ -155,7 +163,7 @@ let dune_name = Package.Name.of_string "dune"
 let odoc_name = Package.Name.of_string "odoc"
 
 let insert_dune_dep depends dune_version =
-  let constraint_ : Package.Dependency.Constraint.t =
+  let constraint_ : Package.Constraint.t =
     let dune_version = Dune_lang.Syntax.Version.to_string dune_version in
     Uop (Gte, String_literal dune_version)
   in
@@ -186,7 +194,7 @@ let insert_dune_dep depends dune_version =
   loop [] depends
 ;;
 
-let rec already_requires_odoc : Package.Dependency.Constraint.t -> bool = function
+let rec already_requires_odoc : Package.Constraint.t -> bool = function
   | Bvar { name = "with-doc" | "build" | "post" } | Uop _ | Bop _ -> true
   | Bvar _ -> false
   | And l -> List.for_all ~f:already_requires_odoc l
@@ -194,7 +202,7 @@ let rec already_requires_odoc : Package.Dependency.Constraint.t -> bool = functi
 ;;
 
 let insert_odoc_dep depends =
-  let with_doc : Package.Dependency.Constraint.t = Bvar { name = "with-doc" } in
+  let with_doc : Package.Constraint.t = Bvar { name = "with-doc" } in
   let odoc_dep = { Package.Dependency.name = odoc_name; constraint_ = Some with_doc } in
   let rec loop acc = function
     | [] -> List.rev (odoc_dep :: acc)

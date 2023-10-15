@@ -62,71 +62,109 @@ module Id = struct
   module Map = C.Map
 end
 
-module Dependency = struct
-  let nopos pelem = { OpamParserTypes.FullPos.pelem; pos = Opam_file.nopos }
+let nopos pelem = { OpamParserTypes.FullPos.pelem; pos = Opam_file.nopos }
 
-  module Constraint = struct
-    include Dune_lang.Package_constraint
+module Constraint = struct
+  include Dune_lang.Package_constraint
 
-    module Op = struct
-      include Op
+  module Op = struct
+    include Op
 
-      let to_relop = function
-        | Eq -> nopos `Eq
-        | Gte -> nopos `Geq
-        | Lte -> nopos `Leq
-        | Gt -> nopos `Gt
-        | Lt -> nopos `Lt
-        | Neq -> nopos `Neq
-      ;;
+    let to_relop = function
+      | Eq -> nopos `Eq
+      | Gte -> nopos `Geq
+      | Lte -> nopos `Leq
+      | Gt -> nopos `Gt
+      | Lt -> nopos `Lt
+      | Neq -> nopos `Neq
+    ;;
 
-      let to_relop_pelem op =
-        let ({ pelem; _ } : OpamParserTypes.FullPos.relop) = to_relop op in
-        pelem
-      ;;
-    end
-
-    module Variable = struct
-      include Variable
-
-      let to_opam { name } = nopos (OpamParserTypes.FullPos.Ident name)
-
-      let to_opam_filter { name } =
-        OpamTypes.FIdent ([], OpamVariable.of_string name, None)
-      ;;
-    end
-
-    module Value = struct
-      include Value
-
-      let to_opam v =
-        match v with
-        | String_literal x -> nopos (OpamParserTypes.FullPos.String x)
-        | Variable variable -> Variable.to_opam variable
-      ;;
-
-      let to_opam_filter = function
-        | String_literal literal -> OpamTypes.FString literal
-        | Variable variable -> Variable.to_opam_filter variable
-      ;;
-    end
-
-    let rec to_opam_condition = function
-      | Bvar variable ->
-        OpamTypes.Atom (OpamTypes.Filter (Variable.to_opam_filter variable))
-      | Uop (op, value) ->
-        OpamTypes.Atom
-          (OpamTypes.Constraint (Op.to_relop_pelem op, Value.to_opam_filter value))
-      | Bop (op, lhs, rhs) ->
-        OpamTypes.Atom
-          (OpamTypes.Filter
-             (OpamTypes.FOp
-                (Value.to_opam_filter lhs, Op.to_relop_pelem op, Value.to_opam_filter rhs)))
-      | And conjunction -> OpamFormula.ands (List.map conjunction ~f:to_opam_condition)
-      | Or disjunction -> OpamFormula.ors (List.map disjunction ~f:to_opam_condition)
+    let to_relop_pelem op =
+      let ({ pelem; _ } : OpamParserTypes.FullPos.relop) = to_relop op in
+      pelem
     ;;
   end
 
+  module Variable = struct
+    include Variable
+
+    let to_opam { name } = nopos (OpamParserTypes.FullPos.Ident name)
+    let to_opam_filter { name } = OpamTypes.FIdent ([], OpamVariable.of_string name, None)
+  end
+
+  module Value = struct
+    include Value
+
+    let to_opam v =
+      match v with
+      | String_literal x -> nopos (OpamParserTypes.FullPos.String x)
+      | Variable variable -> Variable.to_opam variable
+    ;;
+
+    let to_opam_filter = function
+      | String_literal literal -> OpamTypes.FString literal
+      | Variable variable -> Variable.to_opam_filter variable
+    ;;
+  end
+
+  let rec to_opam_condition = function
+    | Bvar variable ->
+      OpamTypes.Atom (OpamTypes.Filter (Variable.to_opam_filter variable))
+    | Uop (op, value) ->
+      OpamTypes.Atom
+        (OpamTypes.Constraint (Op.to_relop_pelem op, Value.to_opam_filter value))
+    | Bop (op, lhs, rhs) ->
+      OpamTypes.Atom
+        (OpamTypes.Filter
+           (OpamTypes.FOp
+              (Value.to_opam_filter lhs, Op.to_relop_pelem op, Value.to_opam_filter rhs)))
+    | And conjunction -> OpamFormula.ands (List.map conjunction ~f:to_opam_condition)
+    | Or disjunction -> OpamFormula.ors (List.map disjunction ~f:to_opam_condition)
+  ;;
+
+  type context =
+    | Root
+    | Ctx_and
+    | Ctx_or
+
+  (* The printer in opam-file-format does not insert parentheses on its own,
+     but it is possible to use the [Group] constructor with a singleton to
+     force insertion of parentheses. *)
+  let group e = nopos (Group (nopos [ e ]) : OpamParserTypes.FullPos.value_kind)
+  let group_if b e = if b then group e else e
+
+  let op_list op = function
+    | [] ->
+      User_error.raise
+        [ Pp.textf "logical operations with no arguments are not supported" ]
+    | v :: vs ->
+      List.fold_left ~init:v vs ~f:(fun a b ->
+        nopos (OpamParserTypes.FullPos.Logop (nopos op, a, b)))
+  ;;
+
+  let opam_constraint t : OpamParserTypes.FullPos.value =
+    let open OpamParserTypes.FullPos in
+    let rec opam_constraint context = function
+      | Bvar v -> Variable.to_opam v
+      | Uop (op, x) -> nopos (Prefix_relop (Op.to_relop op, Value.to_opam x))
+      | Bop (op, x, y) -> nopos (Relop (Op.to_relop op, Value.to_opam x, Value.to_opam y))
+      | And cs -> logical_op `And cs ~inner_ctx:Ctx_and ~group_needed:false
+      | Or cs ->
+        let group_needed =
+          match context with
+          | Root -> false
+          | Ctx_and -> true
+          | Ctx_or -> false
+        in
+        logical_op `Or cs ~inner_ctx:Ctx_or ~group_needed
+    and logical_op op cs ~inner_ctx ~group_needed =
+      List.map cs ~f:(opam_constraint inner_ctx) |> op_list op |> group_if group_needed
+    in
+    opam_constraint Root t
+  ;;
+end
+
+module Dependency = struct
   type t =
     { name : Name.t
     ; constraint_ : Constraint.t option
@@ -159,55 +197,8 @@ module Dependency = struct
       ]
   ;;
 
-  type context =
-    | Root
-    | Ctx_and
-    | Ctx_or
-
-  (* The printer in opam-file-format does not insert parentheses on its own,
-     but it is possible to use the [Group] constructor with a singleton to
-     force insertion of parentheses. *)
-  let group e = nopos (Group (nopos [ e ]) : OpamParserTypes.FullPos.value_kind)
-  let group_if b e = if b then group e else e
-
-  let op_list op = function
-    | [] ->
-      User_error.raise
-        [ Pp.textf "logical operations with no arguments are not supported" ]
-    | v :: vs ->
-      List.fold_left ~init:v vs ~f:(fun a b ->
-        nopos (OpamParserTypes.FullPos.Logop (nopos op, a, b)))
-  ;;
-
-  let opam_constraint t : OpamParserTypes.FullPos.value =
-    let open OpamParserTypes.FullPos in
-    let rec opam_constraint context = function
-      | Constraint.Bvar v -> Constraint.Variable.to_opam v
-      | Uop (op, x) ->
-        nopos (Prefix_relop (Constraint.Op.to_relop op, Constraint.Value.to_opam x))
-      | Bop (op, x, y) ->
-        nopos
-          (Relop
-             ( Constraint.Op.to_relop op
-             , Constraint.Value.to_opam x
-             , Constraint.Value.to_opam y ))
-      | And cs -> logical_op `And cs ~inner_ctx:Ctx_and ~group_needed:false
-      | Or cs ->
-        let group_needed =
-          match context with
-          | Root -> false
-          | Ctx_and -> true
-          | Ctx_or -> false
-        in
-        logical_op `Or cs ~inner_ctx:Ctx_or ~group_needed
-    and logical_op op cs ~inner_ctx ~group_needed =
-      List.map cs ~f:(opam_constraint inner_ctx) |> op_list op |> group_if group_needed
-    in
-    opam_constraint Root t
-  ;;
-
   let opam_depend { name; constraint_ } =
-    let constraint_ = Option.map ~f:opam_constraint constraint_ in
+    let constraint_ = Option.map ~f:Constraint.opam_constraint constraint_ in
     let pkg = nopos (OpamParserTypes.FullPos.String (Name.to_string name)) in
     match constraint_ with
     | None -> pkg
@@ -513,6 +504,7 @@ type t =
   ; depends : Dependency.t list
   ; conflicts : Dependency.t list
   ; depopts : Dependency.t list
+  ; available : Constraint.t option
   ; info : Info.t
   ; version : string option
   ; has_opam_file : opam_file
@@ -543,6 +535,7 @@ let encode
   ; depends
   ; conflicts
   ; depopts
+  ; available
   ; info
   ; version
   ; tags
@@ -562,6 +555,7 @@ let encode
         ; field_l "depends" Dependency.encode depends
         ; field_l "conflicts" Dependency.encode conflicts
         ; field_l "depopts" Dependency.encode depopts
+        ; field_o "available" Constraint.encode available
         ; field_o "version" string version
         ; field "tags" (list string) ~default:[] tags
         ; field_l
@@ -604,6 +598,10 @@ let decode ~dir =
      and+ depends = field ~default:[] "depends" (repeat Dependency.decode)
      and+ conflicts = field ~default:[] "conflicts" (repeat Dependency.decode)
      and+ depopts = field ~default:[] "depopts" (repeat Dependency.decode)
+     and+ available =
+       field_o
+         "available"
+         (Dune_lang.Syntax.since Stanza.syntax (3, 11) >>> Constraint.decode)
      and+ info = Info.decode ~since:(2, 0) ()
      and+ tags = field "tags" (enter (repeat string)) ~default:[]
      and+ deprecated_package_names =
@@ -637,6 +635,7 @@ let decode ~dir =
      ; depends
      ; conflicts
      ; depopts
+     ; available
      ; info
      ; version
      ; has_opam_file = Exists false
@@ -663,6 +662,7 @@ let to_dyn
   ; depends
   ; conflicts
   ; depopts
+  ; available
   ; info
   ; has_opam_file
   ; tags
@@ -681,6 +681,7 @@ let to_dyn
     ; "depends", list Dependency.to_dyn depends
     ; "conflicts", list Dependency.to_dyn conflicts
     ; "depopts", list Dependency.to_dyn depopts
+    ; "available", option Constraint.to_dyn available
     ; "info", Info.to_dyn info
     ; "has_opam_file", dyn_of_opam_file has_opam_file
     ; "tags", list string tags
@@ -712,6 +713,7 @@ let default name dir =
   ; conflicts = []
   ; info = Info.empty
   ; depopts = []
+  ; available = None
   ; has_opam_file = Exists false
   ; tags = [ "topics"; "to describe"; "your"; "project" ]
   ; deprecated_package_names = Name.Map.empty
@@ -776,6 +778,7 @@ let load_opam_file file name =
   ; conflicts = []
   ; depends = []
   ; depopts = []
+  ; available = None
   ; info =
       { maintainers = get_many "maintainer"
       ; authors = get_many "authors"
