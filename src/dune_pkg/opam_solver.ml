@@ -488,6 +488,7 @@ let opam_package_to_lock_file_pkg
   stats_updater
   version_by_package_name
   opam_package
+  (opam_packages_to_lock : OpamPackage.t list)
   ~(candidates_cache : (Package_name.t, Context_for_dune.candidates) Table.t)
   =
   let name = Package_name.of_opam_package_name (OpamPackage.name opam_package) in
@@ -535,13 +536,13 @@ let opam_package_to_lock_file_pkg
     in
     { Lock_dir.Pkg_info.name; version; dev; source; extra_sources }
   in
-  let deps =
+  let deps_from_filtered_formula deps =
     match
       Resolve_opam_formula.filtered_formula_to_package_names
         ~with_test:false
         (add_self_to_filter_env opam_package (Solver_env.to_env solver_env))
         version_by_package_name
-        opam_file.depends
+        deps
     with
     | Ok dep_package_names ->
       List.map dep_package_names ~f:(fun package_name -> Loc.none, package_name)
@@ -551,6 +552,19 @@ let opam_package_to_lock_file_pkg
         [ "package", Dyn.string (OpamFile.OPAM.package opam_file |> OpamPackage.to_string)
         ; "hints", Dyn.list Resolve_opam_formula.Unsatisfied_formula_hint.to_dyn hints
         ]
+  in
+  let deps = deps_from_filtered_formula opam_file.depends in
+  let depopts =
+    (* We need to filter out depopts that don't appear in the build plan. *)
+    OpamFormula.map
+      (fun (name, x) ->
+        match
+          List.find_opt ~f:(fun p -> OpamPackage.name p = name) opam_packages_to_lock
+        with
+        | Some name -> OpamFormula.Atom (name.name, x)
+        | None -> OpamFormula.Empty)
+      opam_file.depopts
+    |> deps_from_filtered_formula
   in
   let build_env action =
     let env_update =
@@ -613,7 +627,13 @@ let opam_package_to_lock_file_pkg
     then `Compiler
     else `Non_compiler
   in
-  kind, { Lock_dir.Pkg.build_command; install_command; deps; info; exported_env }
+  ( kind
+  , { Lock_dir.Pkg.build_command
+    ; install_command
+    ; deps = deps @ depopts
+    ; info
+    ; exported_env
+    } )
 ;;
 
 let solve_package_list packages context =
@@ -697,6 +717,7 @@ let solve_lock_dir solver_env version_preference repos ~local_packages ~constrai
               stats_updater
               version_by_package_name
               opam_package
+              opam_packages_to_lock
               ~candidates_cache:context.candidates_cache)
         in
         let ocaml =
