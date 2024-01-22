@@ -3,7 +3,14 @@ open Import
 let term =
   let+ builder = Common.Builder.term
   and+ format = Describe_format.arg
-  and+ _ = Describe_lang_compat.arg in
+  and+ _ = Describe_lang_compat.arg
+  and+ filenames_only =
+    let doc =
+      "Print filenames only, each on their own line. \
+      This ignores the --format argument."
+    in
+    Arg.(value & flag & info [ "filenames-only" ] ~doc)
+  in
   let common, config = Common.init builder in
   Scheduler.go ~common ~config
   @@ fun () ->
@@ -28,7 +35,11 @@ let term =
     in
     Dyn.Tuple [ String (Path.to_string opam_file); String contents ]
   in
-  Dyn.List (List.map packages ~f:opam_file_to_dyn) |> Describe_format.print_dyn format
+  if filenames_only then
+    List.iter packages ~f:(fun pkg ->
+      print_endline (Path.Source.to_string (Package.opam_file pkg)))
+  else
+    Dyn.List (List.map packages ~f:opam_file_to_dyn) |> Describe_format.print_dyn format
 ;;
 
 let command =
