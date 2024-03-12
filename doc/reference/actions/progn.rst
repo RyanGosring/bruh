@@ -1,5 +1,6 @@
-progn
------
+#######
+ progn
+#######
 
 .. highlight:: dune
 
@@ -7,8 +8,10 @@ progn
 
    Execute several commands in sequence.
 
-   Example::
+   Example:
 
-     (progn
-      (run ./proga.exe)
-      (run ./progb.exe))
+   .. code::
+
+      (progn
+       (run ./proga.exe)
+       (run ./progb.exe))

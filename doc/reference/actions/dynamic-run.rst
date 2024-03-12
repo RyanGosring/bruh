@@ -1,13 +1,16 @@
-dynamic-run
------------
+#############
+ dynamic-run
+#############
 
 .. highlight:: dune
 
 .. describe:: (dynamic-run <prog> <args>)
 
-   Execute a program that was linked against the ``dune-action-plugin`` library.
-   ``<prog>`` is resolved in the same way as in :doc:`run`.
+   Execute a program that was linked against the ``dune-action-plugin``
+   library. ``<prog>`` is resolved in the same way as in :doc:`run`.
 
-   Example::
+   Example:
 
-   (dynamic-run ./plugin.exe)
+   .. code::
+
+      (dynamic-run ./plugin.exe)

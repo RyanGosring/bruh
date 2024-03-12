@@ -1,5 +1,6 @@
-warnings
---------
+##########
+ warnings
+##########
 
 .. describe:: (warnings ...)
 

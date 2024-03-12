@@ -1,5 +1,6 @@
-version
--------
+#########
+ version
+#########
 
 .. describe:: (version <version>)
 

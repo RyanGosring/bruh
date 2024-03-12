@@ -36,6 +36,31 @@
         })
         melange.overlays.default
         ocamllsp.overlays.default
+        (self: super: {
+          rstfmt = super.rstfmt.overrideAttrs {
+            propagatedBuildInputs = super.rstfmt.propagatedBuildInputs ++ [ super.python3Packages.setuptools ];
+            src = super.fetchFromGitHub {
+              owner = "emillon";
+              repo = "rstfmt";
+              rev = "refs/heads/all-extra";
+              hash = "sha256-rUlZCq3QZ9vrKtsNhKCPHaXLE34xLbaiEVY5k5Hq65Q=";
+            };
+            postPatch = ''
+              sed -i \
+                -e '/VersionChange/a\' \
+                -e '    _add_directive("dune:field", sphinx.directives.ObjectDescription, raw=False)' \
+                rstfmt/rst_extras.py
+              sed -i \
+                -e '/VersionChange/a\' \
+                -e '    _add_directive("dune:stanza", sphinx.directives.ObjectDescription, raw=False)' \
+                rstfmt/rst_extras.py
+              sed -i \
+                -e '/VersionChange/a\' \
+                -e '    _add_directive("dune:action", sphinx.directives.ObjectDescription, raw=False)' \
+                rstfmt/rst_extras.py
+            '';
+          };
+        })
       ];
 
       ocamlformat =
@@ -138,6 +163,7 @@
                   sphinx-autobuild
                   python310Packages.sphinx-copybutton
                   python310Packages.sphinx-rtd-theme
+                  rstfmt
                 ]
               );
               meta.description = ''

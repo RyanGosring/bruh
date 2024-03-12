@@ -1,5 +1,6 @@
-cat
----
+#####
+ cat
+#####
 
 .. highlight:: dune
 
@@ -7,6 +8,8 @@ cat
 
    Sequentially print the contents of files to stdout.
 
-   Example::
+   Example:
 
-   (cat data.txt)
+   .. code::
+
+      (cat data.txt)

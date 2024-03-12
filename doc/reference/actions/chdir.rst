@@ -1,5 +1,6 @@
-chdir
------
+#######
+ chdir
+#######
 
 .. highlight:: dune
 
@@ -7,7 +8,9 @@ chdir
 
    Run an action in a different directory.
 
-   Example::
+   Example:
 
-     (chdir src
-      (run ./build.exe))
+   .. code::
+
+      (chdir src
+       (run ./build.exe))

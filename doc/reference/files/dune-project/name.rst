@@ -1,5 +1,6 @@
-name
-----
+######
+ name
+######
 
 .. describe:: (name <string>)
 
