@@ -318,7 +318,7 @@ let build_module ?(force_write_cmi = false) ?(precompiled_cmi = false) cctx m =
           let dir = Compilation_context.dir cctx in
           let action_with_targets =
             Jsoo_rules.build_cm
-              sctx
+              cctx
               ~dir
               ~in_context
               ~src:(Path.build src)

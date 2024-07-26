@@ -7,6 +7,7 @@ module Ext : sig
   val cmo : t
   val cma : t
   val runtime : t
+  val shape : t
 end
 
 module Flags : sig
