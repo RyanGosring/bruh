@@ -48,5 +48,6 @@ The file dlllibA_stubs.so should not appear in the next list.
   _build/default/libA.ml
   _build/default/mainA.bc-for-jsoo
   _build/default/mainA.bc.js
+  _build/default/mainA.bc.jsoo-shape
   _build/default/mainA.ml
   _build/default/mainA.mli

@@ -380,7 +380,7 @@ let link_rule cc ~runtime ~target ~obj_dir cm ~flags ~linkall ~link_time_code_ge
   js_of_ocaml_rule sctx ~sub_command:Link ~dir ~spec ~target ~flags ~config:None
 ;;
 
-let shapes_enabled = false
+let shapes_enabled = true
 
 let build_cm' sctx ~dir ~in_context ~src ~target ~config ~shapes =
   let spec =
