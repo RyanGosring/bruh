@@ -480,7 +480,7 @@ let setup_build_archives (lib : Library.t) ~top_sorted_modules ~cctx ~expander ~
       let action_with_targets =
         List.map Jsoo_rules.Config.all ~f:(fun config ->
           Jsoo_rules.build_cm
-            sctx
+            cctx
             ~dir
             ~in_context:js_of_ocaml
             ~config:(Some config)

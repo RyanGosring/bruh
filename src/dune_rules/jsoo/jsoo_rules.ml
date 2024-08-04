@@ -380,22 +380,66 @@ let link_rule cc ~runtime ~target ~obj_dir cm ~flags ~linkall ~link_time_code_ge
   js_of_ocaml_rule sctx ~sub_command:Link ~dir ~spec ~target ~flags ~config:None
 ;;
 
-let build_cm' sctx ~dir ~in_context ~src ~target ~config =
-  let spec = Command.Args.Dep src in
+let shapes_enabled = true
+
+let build_cm' sctx ~dir ~in_context ~src ~target ~config ~shapes =
+  let spec =
+    Command.Args.(
+      S
+        [ Dep src
+        ; Dyn
+            (let open Action_builder.O in
+             let+ shapes = shapes in
+             S (List.map shapes ~f:(fun s -> S [ A "--load"; Dep s ])))
+        ])
+  in
   let flags = in_context.Js_of_ocaml.In_context.flags in
-  js_of_ocaml_rule sctx ~sub_command:Compile ~dir ~flags ~spec ~target ~config
+  let rule =
+    js_of_ocaml_rule sctx ~sub_command:Compile ~dir ~flags ~spec ~target ~config
+  in
+  let file_targets =
+    if shapes_enabled
+    then [ Path.Build.set_extension target ~ext:Js_of_ocaml.Ext.shape ]
+    else []
+  in
+  With_targets.add rule ~file_targets
 ;;
 
-let build_cm sctx ~dir ~in_context ~src ~obj_dir ~config =
+let build_cm cctx ~dir ~in_context ~src ~obj_dir ~config:config_opt =
   let name = with_js_ext (Path.basename src) in
-  let target = in_obj_dir ~obj_dir ~config [ name ] in
+  let target = in_obj_dir ~obj_dir ~config:config_opt [ name ] in
+  let sctx = Compilation_context.super_context cctx in
+  let ctx = Super_context.context sctx |> Context.build_context in
+  let shapes =
+    if shapes_enabled
+    then
+      let open Action_builder.O in
+      let+ libs = Resolve.Memo.read (Compilation_context.requires_link cctx)
+      and+ config =
+        match config_opt with
+        | None ->
+          let flags = in_context.Js_of_ocaml.In_context.flags in
+          js_of_ocaml_flags sctx ~dir flags
+          |> Action_builder.bind ~f:(fun (x : _ Js_of_ocaml.Flags.t) -> x.compile)
+          |> Action_builder.map ~f:Config.of_flags
+        | Some config -> Action_builder.return config
+      in
+      Path.build
+        (in_build_dir ctx ~config [ "stdlib"; "stdlib.cma" ^ Js_of_ocaml.Ext.shape ])
+      :: List.concat_map libs ~f:(fun lib ->
+        List.map
+          (jsoo_archives ctx config lib)
+          ~f:(Path.set_extension ~ext:Js_of_ocaml.Ext.shape))
+    else Action_builder.return []
+  in
   build_cm'
     sctx
     ~dir
     ~in_context
     ~src
     ~target
-    ~config:(Option.map config ~f:Action_builder.return)
+    ~shapes
+    ~config:(Option.map config_opt ~f:Action_builder.return)
 ;;
 
 let setup_separate_compilation_rules sctx components =
@@ -447,6 +491,7 @@ let setup_separate_compilation_rules sctx components =
            ~src
            ~target
            ~config:(Some (Action_builder.return config))
+           ~shapes:(Action_builder.return [])
          |> Super_context.add_rule sctx ~dir))
 ;;
 

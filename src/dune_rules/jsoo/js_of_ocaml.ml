@@ -8,6 +8,7 @@ module Ext = struct
   let cmo = ".cmo.js"
   let cma = ".cma.js"
   let runtime = ".bc.runtime.js"
+  let shape = ".jsoo-shape"
 end
 
 let field_oslu name = Ordered_set_lang.Unexpanded.field name
