@@ -5,14 +5,16 @@ These tests show that setting `PKG_CONFIG_ARGN` passes extra args to `pkg-config
   -> process exited with code 0
   -> stdout:
    | dummy-pkg
-  run: $TESTCASE_ROOT/_build/default/.bin/pkgconf --cflags dummy-pkg
+  run: $TESTCASE_ROOT/_build/default/.bin/pkgconf --personality=x86_64-pc-linux-gnu --cflags dummy-pkg
   -> process exited with code 0
   -> stdout:
+   | --personality=x86_64-pc-linux-gnu
    | --cflags
    | dummy-pkg
-  run: $TESTCASE_ROOT/_build/default/.bin/pkgconf --libs dummy-pkg
+  run: $TESTCASE_ROOT/_build/default/.bin/pkgconf --personality=x86_64-pc-linux-gnu --libs dummy-pkg
   -> process exited with code 0
   -> stdout:
+   | --personality=x86_64-pc-linux-gnu
    | --libs
    | dummy-pkg
 
