@@ -35,7 +35,8 @@ let make_local_package_wrapping_dev_tool ~dev_tool ~dev_tool_version
   in
   { Dune_pkg.Local_package.name = local_package_name
   ; version = None
-  ; dependencies = [ dependency ]
+  ; dependencies =
+      Dune_pkg.Package_dependency.list_to_opam_filtered_formula [ dependency ]
   ; conflicts = []
   ; depopts = []
   ; pins = Package_name.Map.empty
