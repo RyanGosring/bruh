@@ -82,12 +82,18 @@ let run_build_system ~common ~request =
       Fiber.return ())
 ;;
 
-let run_build_command_poll_eager ~(common : Common.t) ~config ~request : unit =
+let run_build_command_poll_eager ~pre_request ~(common : Common.t) ~config ~request : unit
+  =
+  let open Fiber.O in
   Scheduler.go_with_rpc_server_and_console_status_reporting ~common ~config (fun () ->
-    Scheduler.Run.poll (run_build_system ~common ~request))
+    Scheduler.Run.poll
+      (let* () = pre_request () in
+       run_build_system ~common ~request))
 ;;
 
-let run_build_command_poll_passive ~(common : Common.t) ~config ~request:_ : unit =
+let run_build_command_poll_passive ~pre_request:_ ~(common : Common.t) ~config ~request:_
+  : unit
+  =
   (* CR-someday aalekseyev: It would've been better to complain if [request] is
      non-empty, but we can't check that here because [request] is a function.*)
   let open Fiber.O in
@@ -106,9 +112,10 @@ let run_build_command_poll_passive ~(common : Common.t) ~config ~request:_ : uni
          run_build_system ~common ~request, ivar))
 ;;
 
-let run_build_command_once ~(common : Common.t) ~config ~request =
+let run_build_command_once ~pre_request ~(common : Common.t) ~config ~request =
   let open Fiber.O in
   let once () =
+    let* () = pre_request () in
     let+ res = run_build_system ~common ~request in
     match res with
     | Error `Already_reported -> raise Dune_util.Report_error.Already_reported
@@ -122,6 +129,30 @@ let run_build_command ~(common : Common.t) ~config ~request =
    | Yes Eager -> run_build_command_poll_eager
    | Yes Passive -> run_build_command_poll_passive
    | No -> run_build_command_once)
+    ~pre_request:(fun () -> Fiber.return ())
+    ~common
+    ~config
+    ~request
+;;
+
+let run_build_command_fmt ~(common : Common.t) ~config ~request =
+  let lock_ocamlformat () =
+    if Lazy.force Lock_dev_tool.is_enabled
+    then
+      (* Note that generating the ocamlformat lockdir here means
+             that it will be created when a user runs `dune fmt` but not
+             when a user runs `dune build @fmt`. It's important that
+             this logic remain outside of `dune build`, as `dune
+             build` is intended to only build targets, and generating
+             a lockdir is not building a target. *)
+      Lock_dev_tool.lock_ocamlformat () |> Memo.run
+    else Fiber.return ()
+  in
+  (match Common.watch common with
+   | Yes Eager -> run_build_command_poll_eager
+   | Yes Passive -> run_build_command_poll_passive
+   | No -> run_build_command_once)
+    ~pre_request:lock_ocamlformat
     ~common
     ~config
     ~request
@@ -231,24 +262,11 @@ let fmt =
     in
     let common, config = Common.init builder in
     let request (setup : Import.Main.build_system) =
-      let open Action_builder.O in
-      let* () =
-        if Lazy.force Lock_dev_tool.is_enabled
-        then
-          (* Note that generating the ocamlformat lockdir here means
-             that it will be created when a user runs `dune fmt` but not
-             when a user runs `dune build @fmt`. It's important that
-             this logic remain outside of `dune build`, as `dune
-             build` is intended to only build targets, and generating
-             a lockdir is not building a target. *)
-          Action_builder.of_memo (Lock_dev_tool.lock_ocamlformat ())
-        else Action_builder.return ()
-      in
       let dir = Path.(relative root) (Common.prefix_target common ".") in
       Alias.in_dir ~name:Dune_rules.Alias.fmt ~recursive:true ~contexts:setup.contexts dir
       |> Alias.request
     in
-    run_build_command ~common ~config ~request
+    run_build_command_fmt ~common ~config ~request
   in
   Cmd.v (Cmd.info "fmt" ~doc ~man ~envs:Common.envs) term
 ;;
