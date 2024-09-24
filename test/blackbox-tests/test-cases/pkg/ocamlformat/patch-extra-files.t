@@ -1,4 +1,12 @@
-This is a current bug, 'dune fmt' misses extra files from "dev-tools.locks" directory for the first run.
+'dune fmt' produce lock files inside "dev-tools.locks/ocamlformat" before it starts building
+ocamlformat and its dependencies during the same run of the "dune fmt" command. The source tree is
+loaded before the lock files are produced, this is why any 'patch' file inside
+'dev-tools.locks/ocmalformat' is not copied inside the 'build' directory when a rule depends on it.
+
+In the case of this issue, there is a rule that depends on an 'patch' file in order to copy the file
+inside '_private/default/..' directory, since the file could not be copied, the rule is not activated.
+So it fails when 'dune' trying to apply the patch. After any follwing run of 'dune fmt', it works
+because the 'patch' file is already present.
 
   $ . ./helpers.sh
   $ mkrepo
@@ -47,7 +55,7 @@ Make the ocamlformat opam package which uses a patch:
 Make a project that uses the fake ocamlformat:
   $ make_project_with_dev_tool_lockdir
 
-First time run
+First run of 'dune fmt'
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt 2>&1 | sed -E 's#.*.sandbox/[^/]+#.sandbox/$SANDBOX#g'
   Solution for dev-tools.locks/ocamlformat:
   - ocamlformat.0.26.2
@@ -60,7 +68,11 @@ First time run
   -> required by alias .formatted/fmt
   -> required by alias fmt
 
-Second time run
+The second run will works because the 'patch' is already in the source.
+  $ ls dev-tools.locks/ocamlformat/ocamlformat.files
+  patch-for-ocamlformat.patch
+
+Second run of 'dune fmt'
   $ DUNE_CONFIG__LOCK_DEV_TOOL=enabled dune fmt
   File "foo.ml", line 1, characters 0-0:
   Error: Files _build/default/foo.ml and _build/default/.formatted/foo.ml
