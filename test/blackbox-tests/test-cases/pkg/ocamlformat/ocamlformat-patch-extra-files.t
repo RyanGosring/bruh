@@ -37,9 +37,9 @@ Make the ocamlformat opam package which uses a patch:
   > extra-files: ["patch-for-ocamlformat.patch" "md5=$(md5sum patch-for-ocamlformat.patch | cut -f1 -d' ')"]
   > patches: ["patch-for-ocamlformat.patch"]
   > url {
-  >  src:"file://$PWD/ocamlformat-0.1.tar.gz"
+  >  src:"file://$PWD/ocamlformat-0.1.tar"
   >  checksum: [
-  >   "md5=$(md5sum ocamlformat-0.1.tar.gz | cut -f1 -d' ')"
+  >   "md5=$(md5sum ocamlformat-0.1.tar | cut -f1 -d' ')"
   >  ]
   > }
   > EOF
